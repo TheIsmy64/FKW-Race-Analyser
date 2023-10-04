@@ -1,6 +1,11 @@
 import dolphin_memory_engine as dp
 import os
 import time
+import sys
+
+# Texts Lists
+posTexts = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"]
+itemTexts = ["Green Shell", "Red Shell", "Banana\t", "Fake Item Box", "Mushroom", "/", "Bob-omb\t", "Blue Shell", "Lightning", "Star\t", "Golden Mushroom", "Mega Mushroom", "Feather\t", "POW Block", "Thunder Cloud", "Bullet Bill", "/", "/", "/", "/", "None"]
 
 def read_half(p):
     top = dp.read_byte(p)
@@ -43,11 +48,11 @@ def time_diff(time1, time2):
     return int_to_time(diff)
 
 def print_pos_tracker(posTimes, execTime):
-    print("Pos\tFrames\tTime\t\tPercentage")
+    print("Pos\tTime\t\tPercentage")
     for i in range(12):
-        posTime = int_to_time(int(posTimes[i] * 1000 / 60))
-        posPerc = posTimes[i] / execTime * 100
-        print(posTexts[i] + "\t" + str(posTimes[i]) + "\t" + posTime + "\t" + precision(posPerc, 2) + "%")
+        posTime = frames_to_short_time(posTimes[i])
+        posPerc = float_to_percentage(posTimes[i] / execTime)
+        print(posTexts[i] + "\t" + posTime + "\t" + posPerc)
     print("")
 
 def print_lap_data(lapData):
@@ -74,189 +79,257 @@ def print_item_counts(itemCounts):
 def get_bit(w, b):
     return (w & pow(2, b)) != 0
 
-if not dp.is_hooked():
-    dp.hook()
+def frames_to_short_time(time):
+    return int_to_time(int(time * 1000 / 60))[0:8]
 
-region = chr(dp.read_byte(0x80000003))
-staticInstanceInfo = 0
-staticInstancePlayer = 0
-staticInstanceItem = 0
-
-if region == "P":
-    staticInstanceInfo = 0x809bd730
-    staticInstancePlayer = 0x809c18f8
-    staticInstanceItem = 0x809c3618
-if region == "E":
-    staticInstanceInfo = 0x809b8f70
-    staticInstancePlayer = 0x809bd110
-    staticInstanceItem = 0x809bee20
-if region == "J":
-    staticInstanceInfo = 0x809bc790
-    staticInstancePlayer = 0x809c0958
-    staticInstanceItem = 0x809c2678
-if region == "K":
-    staticInstanceInfo = 0x809abd70
-    staticInstancePlayer = 0x809aff38
-    staticInstanceItem = 0x809b1c58
-
-# Texts Lists
-posTexts = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"]
-itemTexts = ["Green Shell", "Red Shell", "Banana\t", "Fake Item Box", "Mushroom", "/", "Bob-omb\t", "Blue Shell", "Lightning", "Star\t", "Golden Mushroom", "Mega Mushroom", "Feather\t", "POW Block", "Thunder Cloud", "Bullet Bill", "/", "/", "/", "/", "None"]
-
-# Initialisation of variables
-NOITEM = 20
-oldClock = 0
-execTime = 0
-previousRaceComp = 0
-distance = 0
-reversing = False
-starTime = 0
-shockedTime = 0
-megaTime = 0
-squishTime = 0
-bulletTime = 0
-tcTime = 0
-tricksCount = 0
-previousItem = NOITEM
-previousItemCount = 0
-currentItem = NOITEM
-currentItemCount = 0
-roulettePreviousItem = NOITEM
-inTrick = 0
-wasInTrick = 0
-posTimes = [0] * 12
-itemCounts = [[0 for x in range(3)] for y in range(16)]
-lapData = [[0, 0, "00:00.000", "00:00.000", 0, 0, 0] for y in range(50)]
+def float_to_percentage(n):
+    n = n * 100
+    string = "{:.2f}".format(n) + "%"
+    if n < 100:
+        string = "0" + string
+    if n < 10:
+        string = "0" + string
+    return string
 
 # Display Mode
-n = 60
-noLimit = n == -1
+def main():
 
-while 1:
+    # Initialisation of variables
+    gameID = ""
+    NOITEM = 20
+    oldClock = 0
+    execTime = 0
+    previousRaceComp = 0
+    distance = 0
+    reversing = False
+    starTime = 0
+    shockedTime = 0
+    megaTime = 0
+    squishTime = 0
+    bulletTime = 0
+    tcTime = 0
+    tricksCount = 0
+    previousItem = NOITEM
+    previousItemCount = 0
+    currentItem = NOITEM
+    currentItemCount = 0
+    roulettePreviousItem = NOITEM
+    inTrick = 0
+    wasInTrick = 0
+    posTimes = [0] * 12
+    itemCounts = [[0 for x in range(3)] for y in range(16)]
+    lapData = [[0, 0, "00:00.000", "00:00.000", 0, 0, 0] for y in range(50)]
     
-    RaceInfo = dp.read_word(staticInstanceInfo)
-    PlayerHolder = dp.read_word(staticInstancePlayer)
-    ItemHolder = dp.read_word(staticInstanceItem)
+    localClock = 0
+    try:
+        timeLimit = int(sys.argv[1])
+    except:
+        timeLimit = -1
+    noLimit = timeLimit == -1
     
-    if RaceInfo != 0 and PlayerHolder != 0:
+    # Forever...
+    while 1:
         
-        RaceInfoPlayers     = dp.read_word(RaceInfo + 0x0C)
-        RaceInfoPlayer      = dp.read_word(RaceInfoPlayers)
-        ItemHolderPlayer    = dp.read_word(ItemHolder + 0x14)
-        PlayerRoulette      = ItemHolderPlayer + 0x54
-        PlayerInventory     = ItemHolderPlayer + 0x88
+        if isinstance(timeLimit, int):
+            if timeLimit < 0:
+                noLimit = True
+        else:
+            noLimit = True
         
-        # Data from RaceInfo
-        stage               = dp.read_word(RaceInfo + 0x28)
+        while not dp.is_hooked():
+            if localClock % 10 == 0:
+                os.system("cls")
+                print("Start the game before proceeding!")
+            dp.hook()
+            localClock += 1
         
-        # Data from RaceInfoPlayer
-        pid                 = dp.read_byte(RaceInfoPlayer + 0x08)
-        raceComp            = dp.read_float(RaceInfoPlayer + 0x10)
-        pos                 = dp.read_byte(RaceInfoPlayer + 0x20)
-        currentLap          = read_half(RaceInfoPlayer + 0x24)
-        clock               = dp.read_word(RaceInfoPlayer + 0x2C) - 412     # Offset for proper maths
-        framesFirst         = dp.read_word(RaceInfoPlayer + 0x30)
-        stateFlags          = dp.read_word(RaceInfoPlayer + 0x38)
-        lapFinishTimes      = dp.read_word(RaceInfoPlayer + 0x3C)
-        raceFinishTime      = dp.read_word(RaceInfoPlayer + 0x40)
+        while gameID != "RMC":
+            if localClock % 100000 == 0:
+                os.system("cls")
+                print("This is not an instance of Mario Kart Wii! Change game and retry!")
+            gameID = chr(dp.read_byte(0x80000000)) + chr(dp.read_byte(0x80000001)) + chr(dp.read_byte(0x80000002))
+            localClock += 1
         
-        Players             = dp.read_word(PlayerHolder + 0x20)
-        Player              = dp.read_word(Players + pid * 0x04)
-        PlayerSub           = dp.read_word(Player + 0x10)
-        PlayerSub10         = dp.read_word(PlayerSub + 0x10)
-        PlayerSub1C         = dp.read_word(PlayerSub + 0x1C)
+        region = chr(dp.read_byte(0x80000003))
+        staticInstanceInfo = 0
+        staticInstancePlayer = 0
+        staticInstanceItem = 0
+
+        if region == "P":
+            staticInstanceInfo = 0x809bd730
+            staticInstancePlayer = 0x809c18f8
+            staticInstanceItem = 0x809c3618
+        if region == "E":
+            staticInstanceInfo = 0x809b8f70
+            staticInstancePlayer = 0x809bd110
+            staticInstanceItem = 0x809bee20
+        if region == "J":
+            staticInstanceInfo = 0x809bc790
+            staticInstancePlayer = 0x809c0958
+            staticInstanceItem = 0x809c2678
+        if region == "K":
+            staticInstanceInfo = 0x809abd70
+            staticInstancePlayer = 0x809aff38
+            staticInstanceItem = 0x809b1c58
         
-        # Data from PlayerSub10
-        speed               = dp.read_float(PlayerSub10 + 0x20)
+        RaceInfo = dp.read_word(staticInstanceInfo)
+        PlayerHolder = dp.read_word(staticInstancePlayer)
+        ItemHolder = dp.read_word(staticInstanceItem)
         
-        # Data from PlayerSub1C
-        bitfield0           = dp.read_word(PlayerSub1C + 0x04)
-        bitfield1           = dp.read_word(PlayerSub1C + 0x08)
-        bitfield2           = dp.read_word(PlayerSub1C + 0x0C)
-        
-        # Data from PlayerInventory
-        currentItem         = dp.read_word(PlayerInventory + 0x04)
-        currentItemCount    = dp.read_word(PlayerInventory + 0x08)
-        rouletteNextItem    = dp.read_word(PlayerRoulette + 0x1C)
-        
-        isRace = stage == 2
-        if isRace and oldClock != clock and clock != 0:
+        if RaceInfo != 0 and PlayerHolder != 0 and ItemHolder != 0:
             
-            # We're in a race and the program is running: we increment the execution time by 1
-            execTime += 1
+            RaceInfoPlayers     = dp.read_word(RaceInfo + 0x0C)
+            RaceInfoPlayer      = dp.read_word(RaceInfoPlayers)
+            ItemHolderPlayer    = dp.read_word(ItemHolder + 0x14)
+            PlayerRoulette      = ItemHolderPlayer + 0x54
+            PlayerInventory     = ItemHolderPlayer + 0x88
             
-            # Item states and timers
-            inStar      = get_bit(bitfield1, 31)
-            isShocked   = get_bit(bitfield2, 7)
-            inMega      = get_bit(bitfield2, 15)
-            isSquished  = get_bit(bitfield2, 16)
-            inBullet    = get_bit(bitfield2, 27)
-            hasTC       = get_bit(bitfield2, 29)
+            # Data from RaceInfo
+            stage               = dp.read_word(RaceInfo + 0x28)
             
-            starTime += inStar
-            shockedTime += isShocked
-            megaTime += inMega
-            squishTime += isSquished
-            bulletTime += inBullet
-            tcTime += hasTC
+            # Data from RaceInfoPlayer
+            pid                 = dp.read_byte(RaceInfoPlayer + 0x08)
+            raceComp            = dp.read_float(RaceInfoPlayer + 0x10)
+            pos                 = dp.read_byte(RaceInfoPlayer + 0x20)
+            currentLap          = read_half(RaceInfoPlayer + 0x24)
+            clock               = dp.read_word(RaceInfoPlayer + 0x2C) - 412 # Offset for proper maths
+            framesFirst         = dp.read_word(RaceInfoPlayer + 0x30)
+            stateFlags          = dp.read_word(RaceInfoPlayer + 0x38)
+            lapFinishTimes      = dp.read_word(RaceInfoPlayer + 0x3C)
+            raceFinishTime      = dp.read_word(RaceInfoPlayer + 0x40)
             
-            # Speed and distance
-            distance += abs(speed) / 216000
-            avgSpeed = distance * 216000 / execTime
-            speedText = "km/h"
-            if speed < 0:
-                reversing = True
-                speedText = "km/h (R)"
-            else:
-                reversing = False
+            Players             = dp.read_word(PlayerHolder + 0x20)
+            Player              = dp.read_word(Players + pid * 0x04)
+            PlayerSub           = dp.read_word(Player + 0x10)
+            PlayerSub10         = dp.read_word(PlayerSub + 0x10)
+            PlayerSub1C         = dp.read_word(PlayerSub + 0x1C)
             
-            # Position Timers
-            posTimes[pos - 1] += 1
+            # Data from PlayerSub10
+            speed               = dp.read_float(PlayerSub10 + 0x20)
             
-            # Tricks
-            inTrick = get_bit(bitfield1, 6)
-            if not wasInTrick and inTrick:
-                tricksCount += 1
+            # Data from PlayerSub1C
+            bitfield0           = dp.read_word(PlayerSub1C + 0x04)
+            bitfield1           = dp.read_word(PlayerSub1C + 0x08)
+            bitfield2           = dp.read_word(PlayerSub1C + 0x0C)
             
-            # Items
-            if previousItem == NOITEM and currentItem != NOITEM:
-                itemCounts[currentItem][currentItemCount - 1] += 1
-            if roulettePreviousItem == 0x0E and rouletteNextItem == NOITEM and hasTC:
-                itemCounts[roulettePreviousItem][0] += 1
+            # Data from PlayerInventory
+            currentItem         = dp.read_word(PlayerInventory + 0x04)
+            currentItemCount    = dp.read_word(PlayerInventory + 0x08)
+            rouletteNextItem    = dp.read_word(PlayerRoulette + 0x1C)
             
-            # End of Lap
-            latestCompletedLap = int(raceComp) - 1
-            if int(previousRaceComp) != int(raceComp) and latestCompletedLap >= 1:
+            isRace = stage == 2
+            if isRace and oldClock != clock and clock != 0:
                 
-                mins = read_half(lapFinishTimes + (latestCompletedLap - 1) * 0x0C + 0x04)
-                secs = dp.read_byte(lapFinishTimes + (latestCompletedLap - 1) * 0x0C + 0x06)
-                mils = read_half(lapFinishTimes + (latestCompletedLap - 1) * 0x0C + 0x08)
-                cumTime = int_to_time((mins * 60 + secs) * 1000 + mils)
+                # We're in a race and the program is running: we increment the execution time by 1
+                execTime += 1
                 
-                if latestCompletedLap == 1:
-                    lapData[latestCompletedLap - 1] = [
-                                                        clock,                                                  # Lap Clock
-                                                        clock,                                                  # Cumulative Clock
-                                                        cumTime,                                                # Lap Time
-                                                        cumTime,                                                # Cumulative Time
-                                                        distance,                                               # Lap Distance
-                                                        distance,                                               # Cumulative Distance
-                                                        distance * 216000 / clock                               # Average Speed
-                                                      ]
+                # Item states and timers
+                inStar      = get_bit(bitfield1, 31)
+                isShocked   = get_bit(bitfield2, 7)
+                inMega      = get_bit(bitfield2, 15)
+                isSquished  = get_bit(bitfield2, 16)
+                inBullet    = get_bit(bitfield2, 27)
+                hasTC       = get_bit(bitfield2, 29)
+                
+                starTime += inStar
+                shockedTime += isShocked
+                megaTime += inMega
+                squishTime += isSquished
+                bulletTime += inBullet
+                tcTime += hasTC
+                
+                # Speed and distance
+                distance += abs(speed) / 216000
+                avgSpeed = distance * 216000 / execTime
+                speedText = "km/h"
+                if speed < 0:
+                    reversing = True
+                    speedText = "km/h (R)"
                 else:
-                    lapData[latestCompletedLap - 1] = [
-                                                        clock - lapData[latestCompletedLap - 2][1],                                                             # Lap Clock
-                                                        clock,                                                                                                  # Cumulative Clock
-                                                        time_diff(cumTime, lapData[latestCompletedLap - 2][3]),                                                 # Lap Time
-                                                        cumTime,                                                                                                # Cumulative Time
-                                                        distance - lapData[latestCompletedLap - 2][5],                                                          # Lap Distance
-                                                        distance,                                                                                               # Cumulative Distance
-                                                        (distance - lapData[latestCompletedLap - 2][5]) * 216000 / (clock - lapData[latestCompletedLap - 2][1]) # Average Speed
-                                                      ]
+                    reversing = False
+                
+                # Position Timers
+                posTimes[pos - 1] += 1
+                
+                # Tricks
+                inTrick = get_bit(bitfield1, 6)
+                if not wasInTrick and inTrick:
+                    tricksCount += 1
+                
+                # Items
+                if previousItem == NOITEM and currentItem != NOITEM:
+                    itemCounts[currentItem][currentItemCount - 1] += 1
+                if roulettePreviousItem == 0x0E and rouletteNextItem == NOITEM and hasTC:
+                    itemCounts[roulettePreviousItem][0] += 1
+                
+                # End of Lap
+                latestCompletedLap = int(raceComp) - 1
+                if int(previousRaceComp) != int(raceComp) and latestCompletedLap >= 1:
+                    
+                    mins = read_half(lapFinishTimes + (latestCompletedLap - 1) * 0x0C + 0x04)
+                    secs = dp.read_byte(lapFinishTimes + (latestCompletedLap - 1) * 0x0C + 0x06)
+                    mils = read_half(lapFinishTimes + (latestCompletedLap - 1) * 0x0C + 0x08)
+                    cumTime = int_to_time((mins * 60 + secs) * 1000 + mils)
+                    
+                    if latestCompletedLap == 1:
+                        lapData[latestCompletedLap - 1] = [
+                                                            clock,                                                  # Lap Clock
+                                                            clock,                                                  # Cumulative Clock
+                                                            cumTime,                                                # Lap Time
+                                                            cumTime,                                                # Cumulative Time
+                                                            distance,                                               # Lap Distance
+                                                            distance,                                               # Cumulative Distance
+                                                            distance * 216000 / clock                               # Average Speed
+                                                          ]
+                    else:
+                        lapData[latestCompletedLap - 1] = [
+                                                            clock - lapData[latestCompletedLap - 2][1],                                                             # Lap Clock
+                                                            clock,                                                                                                  # Cumulative Clock
+                                                            time_diff(cumTime, lapData[latestCompletedLap - 2][3]),                                                 # Lap Time
+                                                            cumTime,                                                                                                # Cumulative Time
+                                                            distance - lapData[latestCompletedLap - 2][5],                                                          # Lap Distance
+                                                            distance,                                                                                               # Cumulative Distance
+                                                            (distance - lapData[latestCompletedLap - 2][5]) * 216000 / (clock - lapData[latestCompletedLap - 2][1]) # Average Speed
+                                                          ]
+                
+                # Display
+                if execTime % timeLimit == 0 or noLimit:
+                    os.system("cls")
+                    
+                    print("Execution Time:\t\t" + str(execTime) + "\t\tRace Clock:\t\t" + str(clock) + "\t\tFrames Lost:\t" + str(clock - execTime))
+                    print("Current Lap:\t\t" + str(currentLap) + "/50\t\tRace Completion:\t" + precision(raceComp, 3))
+                    print("Speed:\t\t\t" + precision(abs(speed), 2) + speedText + "\tAverage Speed:\t\t" + precision(avgSpeed, 2) + "km/h")
+                    print("Total distance:\t\t" + precision(distance, 3) + "km")
+                    print("Position:\t\t" + posTexts[pos - 1])
+                    print("Star Time:\t\t" + frames_to_short_time(starTime) + "\t\tMega Time:\t\t" + frames_to_short_time(megaTime))
+                    print("Shocked Time:\t\t" + frames_to_short_time(shockedTime) + "\t\tSquished Time:\t\t" + frames_to_short_time(squishTime))
+                    print("Bullet Time:\t\t" + frames_to_short_time(bulletTime) + "\t\tThundercloud Time:\t" + frames_to_short_time(tcTime))
+                    print("Current Item:\t\t" + str(currentItemCount) + "× " + itemTexts[currentItem])
+                    print("Tricks Count:\t\t" + str(tricksCount))
+                    
+                    print("")
+                    
+                    print_pos_tracker(posTimes, execTime)
+                    print_item_counts(itemCounts)
+                    print_lap_data(lapData)
+                    
+                    print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                
+                previousRaceComp = raceComp
+                wasInTrick = inTrick
+                roulettePreviousItem = rouletteNextItem
+                previousItem = currentItem
+                oldClock = clock
+                
+            # Get Finish Time
+            minsFinish = read_half(raceFinishTime + 0x04)
+            secsFinish = dp.read_byte(raceFinishTime + 0x06)
+            milsFinish = read_half(raceFinishTime + 0x08)
+            cumFinish = (minsFinish * 60 + secsFinish) * 1000 + milsFinish
             
-            # Display
-            if execTime % n == 0 or noLimit:
-                os.system('cls')
+            if cumFinish != 0:
+                time.sleep(1)
+                os.system("cls")
                 
                 print("Execution Time:\t\t" + str(execTime) + "\t\tRace Clock:\t\t" + str(clock) + "\t\tFrames Lost:\t" + str(clock - execTime))
                 print("Current Lap:\t\t" + str(currentLap) + "/50\t\tRace Completion:\t" + precision(raceComp, 3))
@@ -276,63 +349,34 @@ while 1:
                 print_lap_data(lapData)
                 
                 print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
+         
+        else:
+            if localClock % 100000 == 0:
+                os.system("cls")
+                print("Waiting for a race to start!")
+            oldClock = 0
+            execTime = 0
+            previousRaceComp = 0
+            distance = 0
+            reversing = False
+            starTime = 0
+            shockedTime = 0
+            megaTime = 0
+            squishTime = 0
+            bulletTime = 0
+            tcTime = 0
+            tricksCount = 0
+            previousItem = NOITEM
+            previousItemCount = 0
+            currentItem = NOITEM
+            currentItemCount = 0
+            roulettePreviousItem = NOITEM
+            inTrick = 0
+            wasInTrick = 0
+            posTimes = [0] * 12
+            itemCounts = [[0 for x in range(3)] for y in range(16)]
+            lapData = [[0, 0, "00:00.000", "00:00.000", 0, 0, 0] for y in range(50)]
+            localClock += 1
             
-            previousRaceComp = raceComp
-            wasInTrick = inTrick
-            roulettePreviousItem = rouletteNextItem
-            previousItem = currentItem
-            oldClock = clock
-        
-        # Get Finish Time
-        minsFinish = read_half(raceFinishTime + 0x04)
-        secsFinish = dp.read_byte(raceFinishTime + 0x06)
-        milsFinish = read_half(raceFinishTime + 0x08)
-        cumFinish = (minsFinish * 60 + secsFinish) * 1000 + milsFinish
-        
-        if cumFinish != 0:
-            time.sleep(1)
-            os.system('cls')
-            
-            print("Execution Time:\t\t" + str(execTime) + "\t\tRace Clock:\t\t" + str(clock) + "\t\tFrames Lost:\t" + str(clock - execTime))
-            print("Current Lap:\t\t" + str(currentLap) + "/50\t\tRace Completion:\t" + precision(raceComp, 3))
-            print("Speed:\t\t\t" + precision(abs(speed), 2) + speedText + "\tAverage Speed:\t\t" + precision(avgSpeed, 2) + "km/h")
-            print("Total distance:\t\t" + precision(distance, 3) + "km")
-            print("Position:\t\t" + posTexts[pos - 1])
-            print("Star Time:\t\t" + str(starTime) + "\t\tMega Time:\t\t" + str(megaTime))
-            print("Shocked Time:\t\t" + str(shockedTime) + "\t\tSquished Time:\t\t" + str(squishTime))
-            print("Bullet Time:\t\t" + str(bulletTime) + "\t\tThundercloud Time:\t" + str(tcTime))
-            print("Current Item:\t\t" + str(currentItemCount) + "× " + itemTexts[currentItem])
-            print("Tricks Count:\t\t" + str(tricksCount))
-            
-            print("")
-            
-            print_pos_tracker(posTimes, execTime)
-            print_item_counts(itemCounts)
-            print_lap_data(lapData)
-            
-            print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
-     
-    else:
-        print("Waiting for a race to start!")
-        oldClock = 0
-        execTime = 0
-        previousRaceComp = 0
-        distance = 0
-        reversing = False
-        starTime = 0
-        shockedTime = 0
-        megaTime = 0
-        squishTime = 0
-        bulletTime = 0
-        tcTime = 0
-        tricksCount = 0
-        previousItem = NOITEM
-        previousItemCount = 0
-        currentItem = NOITEM
-        currentItemCount = 0
-        roulettePreviousItem = NOITEM
-        inTrick = 0
-        wasInTrick = 0
-        posTimes = [0] * 12
-        itemCounts = [[0 for x in range(3)] for y in range(16)]
-        lapData = [[0, 0, "00:00.000", "00:00.000", 0, 0, 0] for y in range(50)]
+if __name__ == '__main__':
+    main()
