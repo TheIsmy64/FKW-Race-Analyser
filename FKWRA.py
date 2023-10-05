@@ -108,6 +108,7 @@ def main():
     squishTime = 0
     bulletTime = 0
     tcTime = 0
+    airTime = 0
     tricksCount = 0
     previousItem = NOITEM
     previousItemCount = 0
@@ -115,7 +116,14 @@ def main():
     currentItemCount = 0
     roulettePreviousItem = NOITEM
     inTrick = 0
+    inZipperTrick = 0
     wasInTrick = 0
+    wasInZipperTrick = 0
+    mtState = 0
+    mtBoost = 0
+    mtPreviousState = 0
+    mtCount = 0
+    smtCount = 0
     posTimes = [0] * 12
     itemCounts = [[0 for x in range(3)] for y in range(16)]
     lapData = [[0, 0, "00:00.000", "00:00.000", 0, 0, 0] for y in range(50)]
@@ -123,9 +131,11 @@ def main():
     localClock = 0
     try:
         timeLimit = int(sys.argv[1])
+        if timeLimit < 0
+            timeLimit = 60
     except:
-        timeLimit = -1
-    noLimit = timeLimit == -1
+        timeLimit = 60
+    noLimit = timeLimit == 0
     
     # Forever...
     while 1:
@@ -201,8 +211,10 @@ def main():
             Players             = dp.read_word(PlayerHolder + 0x20)
             Player              = dp.read_word(Players + pid * 0x04)
             PlayerSub           = dp.read_word(Player + 0x10)
+            PlayerParams        = dp.read_word(Player + 0x14)
             PlayerSub10         = dp.read_word(PlayerSub + 0x10)
             PlayerSub1C         = dp.read_word(PlayerSub + 0x1C)
+            
             
             # Data from PlayerSub10
             speed               = dp.read_float(PlayerSub10 + 0x20)
@@ -230,6 +242,7 @@ def main():
                 isSquished  = get_bit(bitfield2, 16)
                 inBullet    = get_bit(bitfield2, 27)
                 hasTC       = get_bit(bitfield2, 29)
+                inAir       = dp.read_word(PlayerSub1C + 0x1C) != 0
                 
                 starTime += inStar
                 shockedTime += isShocked
@@ -237,6 +250,7 @@ def main():
                 squishTime += isSquished
                 bulletTime += inBullet
                 tcTime += hasTC
+                airTime += inAir
                 
                 # Speed and distance
                 distance += abs(speed) / 216000
@@ -251,9 +265,22 @@ def main():
                 # Position Timers
                 posTimes[pos - 1] += 1
                 
+                # Miniturbos
+                mtState = read_half(PlayerSub10 + 0xFC)
+                mtBoost = read_half(PlayerSub10 + 0x0102)
+                
+                if (mtState == 0 or mtState == 1) and mtBoost != 0:
+                    if mtPreviousState == 2:
+                        mtCount += 1
+                    if mtPreviousState == 3:
+                        smtCount += 1
+                
                 # Tricks
                 inTrick = get_bit(bitfield1, 6)
+                inZipperTrick = get_bit(bitfield1, 15)
                 if not wasInTrick and inTrick:
+                    tricksCount += 1
+                if not wasInZipperTrick and inZipperTrick:
                     tricksCount += 1
                 
                 # Items
@@ -301,11 +328,12 @@ def main():
                     print("Speed:\t\t\t" + precision(abs(speed), 2) + speedText + "\tAverage Speed:\t\t" + precision(avgSpeed, 2) + "km/h")
                     print("Total distance:\t\t" + precision(distance, 3) + "km")
                     print("Position:\t\t" + posTexts[pos - 1])
-                    print("Star Time:\t\t" + frames_to_short_time(starTime) + "\t\tMega Time:\t\t" + frames_to_short_time(megaTime))
-                    print("Shocked Time:\t\t" + frames_to_short_time(shockedTime) + "\t\tSquished Time:\t\t" + frames_to_short_time(squishTime))
-                    print("Bullet Time:\t\t" + frames_to_short_time(bulletTime) + "\t\tThundercloud Time:\t" + frames_to_short_time(tcTime))
+                    print("Star Time:\t\t" + frames_to_short_time(starTime) + "\tMega Time:\t\t" + frames_to_short_time(megaTime))
+                    print("Shocked Time:\t\t" + frames_to_short_time(shockedTime) + "\tSquished Time:\t\t" + frames_to_short_time(squishTime))
+                    print("Bullet Time:\t\t" + frames_to_short_time(bulletTime) + "\tThundercloud Time:\t" + frames_to_short_time(tcTime))
+                    print("Air Time:\t\t" + frames_to_short_time(airTime))
                     print("Current Item:\t\t" + str(currentItemCount) + "× " + itemTexts[currentItem])
-                    print("Tricks Count:\t\t" + str(tricksCount))
+                    print("Tricks Count:\t\t" + str(tricksCount) + "\t\tMiniturbo Count:\t" + str(mtCount + smtCount) + " (" + str(mtCount) + " + " + str(smtCount) + ")")
                     
                     print("")
                     
@@ -315,8 +343,10 @@ def main():
                     
                     print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
                 
+                mtPreviousState = mtState
                 previousRaceComp = raceComp
                 wasInTrick = inTrick
+                wasInZipperTrick = inZipperTrick
                 roulettePreviousItem = rouletteNextItem
                 previousItem = currentItem
                 oldClock = clock
@@ -365,6 +395,7 @@ def main():
             squishTime = 0
             bulletTime = 0
             tcTime = 0
+            airTime = 0
             tricksCount = 0
             previousItem = NOITEM
             previousItemCount = 0
@@ -373,6 +404,13 @@ def main():
             roulettePreviousItem = NOITEM
             inTrick = 0
             wasInTrick = 0
+            inZipperTrick = 0
+            wasInZipperTrick = 0
+            mtState = 0
+            mtBoost = 0
+            mtPreviousState = 0
+            mtCount = 0
+            smtCount = 0
             posTimes = [0] * 12
             itemCounts = [[0 for x in range(3)] for y in range(16)]
             lapData = [[0, 0, "00:00.000", "00:00.000", 0, 0, 0] for y in range(50)]
