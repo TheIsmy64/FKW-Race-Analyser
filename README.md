@@ -6,13 +6,7 @@ A program that collects data from FKW races in real time.
 * The *dolphin-memory-engine* python library that can be found [here](https://github.com/henriquegemignani/py-dolphin-memory-engine), or it can be installed by typing `pip install dolphin-memory-engine` in a terminal.
 
 ## Use
-* Launch the script with `python FKWRA.py` with the possibility of adding the following arguments:
-  * `-rr refreshRate` sets the refresh rate of the display in in-game frames.
-    * To use real time refresh rate, set this option to `0`.
-	* The default value is `60`, or 1 second.
-  * `-mm measurementMode` sets the measurement mode of the distances and speeds on the display.
-    * To use the imperial measurement mode, set this option to `imperial` or `miles`.
-	* If this option isn't set, the default metric measurement mode is used.
+* Launch the script with `python FKWRA.py`. You can launch it with the argument `-h` to see other options.
 * Open any game region of Formula Kart Wii on any Dolphin Emulator instance.
 * When a race starts, the program will automatically find the data it needs!
 
