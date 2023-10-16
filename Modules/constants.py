@@ -41,6 +41,7 @@ sfSpeedDict = {"Metric":	1,
 
 CLOCK_OFFSET = 239
 FKW_LAPS = 50
+LAPS_SHOW_AMOUNT = 3
 NULL = 0
 
 # Terminal Constants

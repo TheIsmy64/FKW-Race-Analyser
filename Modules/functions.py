@@ -1,9 +1,9 @@
 import argparse
+import cursor
 import dolphin_memory_engine as dp
 import os
 import platform
 import time
-import cursor
 
 from Modules.constants import *
 

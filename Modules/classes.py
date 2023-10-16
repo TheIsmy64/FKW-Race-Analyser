@@ -266,8 +266,7 @@ class LapTracker:
 	def __repr__(self):
 		string = "Lap\t\tTime\t\tFrom 1st\tFrom Ahead\tDistance\tAverage Speed\n"
 		for lap in self.laps:
-			if lap.time != Time.empty():
-				string += str(lap)
+			string += str(lap)
 		return string
 	
 	def repr_mode(self, dispMode):
@@ -276,11 +275,11 @@ class LapTracker:
 			string += lap.repr_mode(dispMode)
 		return string
 	
-	def print_latest(self, amount, dispMode):
+	def print_latest(self, dispMode):
 		string = "Lap\t\tTime\t\tFrom 1st\tFrom Ahead\tDistance\tAverage Speed\n"
-		latestLapNumber = self.get_latest_lap_number()
+		latestLapNumber = self.get_latest_lap_number() + 1
 		for lap in self.laps:
-			if lap.number in range(max(1, latestLapNumber - amount), latestLapNumber):
+			if lap.number in range(max(1, latestLapNumber - LAPS_SHOW_AMOUNT), latestLapNumber):
 				string += lap.repr_mode(dispMode)
 		return string
 	
@@ -288,7 +287,8 @@ class LapTracker:
 	def get_latest_lap_number(self):
 		for lap in self.laps:
 			if lap.time == Time.empty():
-				return lap.number
+				return lap.number - 1
+		return FKW_LAPS
 	
 	def get_fastest_lap(self):
 		fastestLap = self.laps[0]
@@ -622,7 +622,7 @@ class Player:
 		self.distance = Distance.empty()
 		self.avgSpeed = Speed.empty()
 		# Setup states
-		self.lapState = TwoStates(min(max(int(self.raceComp), 1), FKW_LAPS + 1), min(max(int(self.raceComp), 1), FKW_LAPS + 1))
+		self.lapState = TwoStates(min(max(int(self.raceComp), 1), FKW_LAPS), min(max(int(self.raceComp), 1), FKW_LAPS))
 		self.posState = TwoStates.empty()
 		self.trickState = TwoStates.empty()
 		self.oobState = TwoStates.empty()
@@ -676,7 +676,7 @@ class Player:
 	
 	def update_states(self):
 		# Update states
-		self.lapState.shift_and_set(min(max(int(self.raceComp), 1), 50))
+		self.lapState.shift_and_set(min(max(int(self.raceComp), 1), FKW_LAPS))
 		self.posState.shift_and_set(read_byte(self.ripp + 0x20))
 		self.trickState.shift_and_set(get_bit(self.bitFields[1], 6) or get_bit(self.bitFields[1], 15))
 		self.oobState.shift_and_set(get_bit(self.bitFields[0], 4))
@@ -729,14 +729,10 @@ class Player:
 	def update_position_tracker(self):
 		self.posTracker.increment(self.posState.currState)
 	
-	def update_lap_tracker(self):
-		a = 0
-	
 	def update(self, raceTime):
 		self.update_data(raceTime)
 		self.update_item_tracker()
 		self.update_position_tracker()
-		self.update_lap_tracker()
 		self.update_states()
 		self.update_timers()
 		self.update_counters()
@@ -761,23 +757,21 @@ class Player:
 		print(f"Air Time:\t{self.airTime.repr_short()}")
 		print()
 	
-	def print_trackers(self, dispMode):
+	def print_trackers(self):
 		print(self.posTracker)
 		print(self.itemTracker)
-		print(self.lapTracker.print_latest(3, dispMode))
 	
-	def print_trackers_finished(self, dispMode):
-		print(self.posTracker)
-		print(self.itemTracker)
-		print(self.lapTracker)
-	
-	def print_all(self, dispMode):
+	def print_all_except_laps(self, dispMode):
 		self.print_data(dispMode)
 		self.print_timers()
-		if self.has_finished():
-			self.print_trackers_finished(dispMode)
-		else:
-			self.print_trackers(dispMode)
+		print(self.posTracker)
+		print(self.itemTracker)
+	
+	def print_all_laps(self, dispMode):
+		print(self.lapTracker.repr_mode(dispMode))
+	
+	def print_latest_laps(self, dispMode):
+		print(self.lapTracker.print_latest(dispMode))
 	
 	# Other Methods
 	def has_finished_lap(self):
@@ -810,12 +804,8 @@ class Race:
 		playerHolder = NULL
 		itemHolder = NULL
 		raceState = -1
-		secondPass = False
 		while raceInfo == NULL or raceState < 2:
-			if not secondPass:
-				clear_screen()
-				print("Waiting for a self to start...")
-				secondPass = True
+			print(end = "Waiting for a race to start...\r")
 			raceInfo = read_word(raceInfoDict[read_region()])
 			raceState = read_word(raceInfo + 0x28)
 		playerHolder = read_word(playerHolderDict[read_region()])
@@ -845,8 +835,11 @@ class Race:
 	def update_laps(self):
 		for lapPlayer in self.players:
 			# If the player has completed a lap, proceed, otherwise go to the next player
-			if lapPlayer.has_finished_lap():
-				lapIndex = int(lapPlayer.raceComp) - 2
+			if lapPlayer.has_finished_lap() or not self.is_ongoing():
+				if self.is_ongoing():
+					lapIndex = int(lapPlayer.raceComp) - 2
+				else:
+					lapIndex = FKW_LAPS - 1
 				lapCompleted = lapPlayer.lapTracker.laps[lapIndex]
 				lapCompleted.update_cumulative_time()
 				lapCompleted.cumDistance = lapPlayer.distance
@@ -887,12 +880,14 @@ class Race:
 	
 	def update(self, framesCaught):
 		self.update_pointers()
-		self.update_timer()
+		if self.is_ongoing():
+			self.update_timer()
 		self.update_stage()
 		self.update_laps()
 		self.update_player_count()
 		for player in self.players:
-			player.update(framesCaught)
+			if not player.has_finished():
+				player.update(framesCaught)
 	
 	def add_players(self):
 		raceInfoPlayers = read_word(self.rip + 0x0C)

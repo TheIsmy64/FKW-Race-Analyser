@@ -13,6 +13,7 @@ def main():
 		try:
 			# Preliminary setup
 			hook_and_check_for_MKW()
+			clear_screen()
 			# Wait for a race to start
 			race = Race.wait_for_race()
 			# Initialise players
@@ -31,16 +32,25 @@ def main():
 				# Print the data of the real player on screen according to the refresh rate
 				if race.time.currState % refreshRate == 0 or not waitForRefreshRate:
 					race.print_race_header(framesCaught)
-					realPlayer.print_all(dispMode)
+					realPlayer.print_all_except_laps(dispMode)
+					realPlayer.print_latest_laps(dispMode)
 					go_to_top()
 				handle_savestates(race.time.currState, framesCaught)
 			# The race has just finished, print the final screen and update the data periodically
 			isEndOfRace = True
+			isLapScreen = False
 			while isEndOfRace:
 				clear_screen()
 				race.update(framesCaught)
-				race.print_race_header(framesCaught)
-				realPlayer.print_all(dispMode)
+				if isLapScreen:
+					race.print_race_header(framesCaught)
+					realPlayer.print_all_except_laps(dispMode)
+					isLapScreen = False
+				else:
+					realPlayer.print_all_laps(dispMode)
+					isLapScreen = True
+				for i in range(5):
+					wait()
 				if not realPlayer.has_finished():
 					isEndOfRace = False
 		except Exception as e:
